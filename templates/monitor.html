@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geospatial Data Pipeline Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function updateStatus() {
+            fetch('/monitor/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('status').textContent = data.status;
+                    document.getElementById('progress').style.width = data.progress_percentage + '%';
+                    document.getElementById('progress-text').textContent = data.progress_percentage.toFixed(2) + '%';
+                    document.getElementById('total').textContent = data.total_features;
+                    document.getElementById('processed').textContent = data.processed_features;
+                    document.getElementById('successful').textContent = data.successful_features;
+                    document.getElementById('failed').textContent = data.failed_features;
+                    document.getElementById('timestamp').textContent = new Date(data.timestamp).toLocaleString();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Update status every 2 seconds
+        setInterval(updateStatus, 2000);
+        // Initial update
+        updateStatus();
+    </script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Geospatial Data Pipeline Monitor</h1>
+        
+        <!-- Status Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Current Status</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-600">Status:</p>
+                    <p id="status" class="font-semibold">Loading...</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Last Updated:</p>
+                    <p id="timestamp" class="font-semibold">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Progress</h2>
+            <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                <div id="progress" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <p id="progress-text" class="text-center font-semibold">0%</p>
+        </div>
+
+        <!-- Statistics -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Statistics</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-gray-50 p-4 rounded">
+                    <p class="text-gray-600">Total Features</p>
+                    <p id="total" class="text-2xl font-bold">0</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded">
+                    <p class="text-gray-600">Processed</p>
+                    <p id="processed" class="text-2xl font-bold">0</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded">
+                    <p class="text-green-600">Successful</p>
+                    <p id="successful" class="text-2xl font-bold text-green-600">0</p>
+                </div>
+                <div class="bg-red-50 p-4 rounded">
+                    <p class="text-red-600">Failed</p>
+                    <p id="failed" class="text-2xl font-bold text-red-600">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karnataka Geospatial Data Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        #map {
+            height: 700px;
+            width: 100%;
+            border-radius: 8px;
+        }
+        .custom-card {
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+        .district-info {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .info-box {
+            padding: 6px 8px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .stats-card {
+            transition: transform 0.2s;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+        .search-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .sync-status {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#"><i class="bi bi-geo-alt-fill"></i> Karnataka Geospatial Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <button class="btn btn-light" onclick="syncData()">
+                            <i class="bi bi-arrow-repeat"></i> Sync Data
+                        </button>
+                    </li>
+                    <li class="nav-item ms-2">
+                        <div class="dropdown">
+                            <button class="btn btn-light dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="exportData('geojson')">GeoJSON</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData('csv')">CSV</a></li>
+                            </ul>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Map Column -->
+            <div class="col-lg-8">
+                <!-- Statistics Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card custom-card stats-card bg-primary text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Districts</h6>
+                                <h3 id="totalDistricts">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card custom-card stats-card bg-success text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Area</h6>
+                                <h3 id="totalArea">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card custom-card stats-card bg-info text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Population</h6>
+                                <h3 id="totalPopulation">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card custom-card stats-card bg-warning text-white">
+                            <div class="card-body">
+                                <h6 class="card-title">Avg. Density</h6>
+                                <h3 id="avgDensity">-</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map Card -->
+                <div class="card custom-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">Karnataka Districts Map</h5>
+                            <span class="sync-status" id="syncStatus">Last synced: Never</span>
+                        </div>
+                        <div class="position-relative">
+                            <div id="map"></div>
+                            <div class="search-box">
+                                <input type="text" class="form-control" id="districtSearch" 
+                                       placeholder="Search districts..." onkeyup="searchDistricts()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Column -->
+            <div class="col-lg-4">
+                <!-- District Info Card -->
+                <div class="card custom-card">
+                    <div class="card-body">
+                        <h5 class="card-title">District Information</h5>
+                        <div class="district-info" id="districtInfo">
+                            <p class="text-muted">Click on a district to view its information</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Card -->
+                <div class="card custom-card">
+                    <div class="card-body">
+                        <h5 class="card-title">District Statistics</h5>
+                        <canvas id="districtChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let geojsonLayer;
+        let districtData = [];
+
+        // Initialize map
+        const map = L.map('map').setView([15.3173, 75.7139], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: ' OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Style functions
+        function getColor(value) {
+            return value > 1000000 ? '#800026' :
+                   value > 500000  ? '#BD0026' :
+                   value > 200000  ? '#E31A1C' :
+                   value > 100000  ? '#FC4E2A' :
+                   value > 50000   ? '#FD8D3C' :
+                   value > 20000   ? '#FEB24C' :
+                   value > 10000   ? '#FED976' : '#FFEDA0';
+        }
+
+        function style(feature) {
+            return {
+                fillColor: getColor(feature.properties.population || 0),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        }
+
+        // Interaction functions
+        function highlightFeature(e) {
+            var layer = e.target;
+            layer.setStyle({
+                weight: 3,
+                color: '#666',
+                dashArray: '',
+                fillOpacity: 0.7
+            });
+            layer.bringToFront();
+            info.update(layer.feature.properties);
+        }
+
+        function resetHighlight(e) {
+            geojsonLayer.resetStyle(e.target);
+            info.update();
+        }
+
+        function updateDistrictInfo(properties) {
+            const infoHtml = `
+                <div class="card-body">
+                    <h4 class="mb-3">${properties.district || 'N/A'}</h4>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Area:</th>
+                            <td>${properties.area_sqkm || 'N/A'} sq km</td>
+                        </tr>
+                        <tr>
+                            <th>Population:</th>
+                            <td>${properties.population?.toLocaleString() || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Density:</th>
+                            <td>${properties.population && properties.area_sqkm ? 
+                                Math.round(properties.population / properties.area_sqkm) + ' per sq km' : 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            document.getElementById('districtInfo').innerHTML = infoHtml;
+            updateChart(properties);
+        }
+
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: (e) => updateDistrictInfo(feature.properties)
+            });
+        }
+
+        // Info control
+        const info = L.control();
+        info.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info-box');
+            this.update();
+            return this._div;
+        };
+        info.update = function (props) {
+            this._div.innerHTML = '<h4>Karnataka District</h4>' + 
+                (props ? '<b>' + props.district + '</b><br />' + 
+                props.population?.toLocaleString() + ' people' : 'Hover over a district');
+        };
+        info.addTo(map);
+
+        // Legend control
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            const grades = [0, 10000, 20000, 50000, 100000, 200000, 500000, 1000000];
+            div.innerHTML = '<h6 class="mb-2">Population</h6>';
+            for (let i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+                    grades[i].toLocaleString() + (grades[i + 1] ? '&ndash;' + grades[i + 1].toLocaleString() + '<br>' : '+');
+            }
+            return div;
+        };
+        legend.addTo(map);
+
+        // Chart initialization
+        let districtChart;
+        function initChart() {
+            const ctx = document.getElementById('districtChart').getContext('2d');
+            districtChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Population', 'Area'],
+                    datasets: [{
+                        label: 'District Statistics',
+                        data: [0, 0],
+                        backgroundColor: ['rgba(54, 162, 235, 0.2)', 'rgba(255, 99, 132, 0.2)'],
+                        borderColor: ['rgba(54, 162, 235, 1)', 'rgba(255, 99, 132, 1)'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(properties) {
+            if (!districtChart) initChart();
+            districtChart.data.datasets[0].data = [
+                properties.population || 0,
+                properties.area_sqkm || 0
+            ];
+            districtChart.update();
+        }
+
+        // Data functions
+        function updateStats(data) {
+            let totalPop = 0, totalArea = 0;
+            data.features.forEach(f => {
+                totalPop += f.properties.population || 0;
+                totalArea += f.properties.area_sqkm || 0;
+            });
+            
+            document.getElementById('totalDistricts').textContent = data.features.length;
+            document.getElementById('totalPopulation').textContent = totalPop.toLocaleString();
+            document.getElementById('totalArea').textContent = totalArea.toFixed(0) + ' km²';
+            document.getElementById('avgDensity').textContent = 
+                Math.round(totalPop / totalArea).toLocaleString() + '/km²';
+        }
+
+        function searchDistricts() {
+            const searchText = document.getElementById('districtSearch').value.toLowerCase();
+            geojsonLayer.eachLayer(layer => {
+                const districtName = layer.feature.properties.district.toLowerCase();
+                if (districtName.includes(searchText)) {
+                    layer.setStyle({ opacity: 1, fillOpacity: 0.7 });
+                } else {
+                    layer.setStyle({ opacity: 0.2, fillOpacity: 0.1 });
+                }
+            });
+        }
+
+        async function syncData() {
+            try {
+                const response = await fetch('/api/v1/districts/sync', { method: 'POST' });
+                const result = await response.json();
+                document.getElementById('syncStatus').textContent = 
+                    'Last synced: ' + new Date().toLocaleString();
+                loadData(); // Reload data after sync
+            } catch (error) {
+                console.error('Sync failed:', error);
+                alert('Failed to sync data. Please try again.');
+            }
+        }
+
+        function exportData(format) {
+            const url = `/api/v1/districts/export?format=${format}`;
+            window.open(url, '_blank');
+        }
+
+        // Load initial data
+        async function loadData() {
+            try {
+                const response = await fetch('/api/v1/districts');
+                const data = await response.json();
+                districtData = data;
+                
+                if (geojsonLayer) {
+                    map.removeLayer(geojsonLayer);
+                }
+                
+                geojsonLayer = L.geoJSON(data, {
+                    style: style,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                
+                map.fitBounds(geojsonLayer.getBounds());
+                updateStats(data);
+                initChart();
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>
